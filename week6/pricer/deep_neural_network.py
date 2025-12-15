@@ -161,7 +161,11 @@ class DeepNeuralNetworkRunner:
         torch.save(self.model.state_dict(), path)
 
     def load(self, path):
-        self.model.load_state_dict(torch.load(path))
+        if self.device is None:
+            raise RuntimeError("Must call setup() before load()")
+        # Map any device (including MPS) to the current device
+        map_location = lambda storage, loc: storage.to(self.device)
+        self.model.load_state_dict(torch.load(path, map_location=map_location))
         self.model.to(self.device)
 
     def inference(self, item):

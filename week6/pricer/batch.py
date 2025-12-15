@@ -1,5 +1,5 @@
 import os
-from groq import Groq
+from openai import OpenAI
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -7,9 +7,9 @@ import pickle
 from tqdm.notebook import tqdm
 
 load_dotenv(override=True)
-groq = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-MODEL = "openai/gpt-oss-20b"
+MODEL = "gpt-4o-mini"  # Batch API supported models: gpt-4o, gpt-4o-mini, gpt-4, gpt-4-turbo, gpt-3.5-turbo
 BATCHES_FOLDER = "batches"
 OUTPUT_FOLDER = "output"
 state = Path("batches.pkl")
@@ -49,7 +49,6 @@ class Batch:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": item.full},
             ],
-            "reasoning_effort": "low",
         }
         line = {
             "custom_id": str(item.id),
@@ -69,11 +68,11 @@ class Batch:
     def send_file(self):
         batch_file = self.batches / self.filename
         with batch_file.open("rb") as f:
-            response = groq.files.create(file=f, purpose="batch")
+            response = openai.files.create(file=f, purpose="batch")
         self.file_id = response.id
 
     def submit_batch(self):
-        response = groq.batches.create(
+        response = openai.batches.create(
             completion_window="24h",
             endpoint="/v1/chat/completions",
             input_file_id=self.file_id,
@@ -81,7 +80,7 @@ class Batch:
         self.batch_id = response.id
 
     def is_ready(self):
-        response = groq.batches.retrieve(self.batch_id)
+        response = openai.batches.retrieve(self.batch_id)
         status = response.status
         if status == "completed":
             self.output_file_id = response.output_file_id
@@ -89,7 +88,7 @@ class Batch:
 
     def fetch_output(self):
         output_file = str(self.output / self.filename)
-        response = groq.files.content(self.output_file_id)
+        response = openai.files.content(self.output_file_id)
         response.write_to_file(output_file)
 
     def apply_output(self):
